@@ -18,6 +18,13 @@ Features
 
 * TODO
 
+Usage
+-------
+
+Update proxies settings in clash config:
+
+    pyclashsub -c [CLASH CONFIG DIR] -u [SUBSCRIBE URL]
+
 Credits
 ---------
 
