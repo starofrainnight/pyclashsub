@@ -6,6 +6,7 @@
 import os
 import stat
 import os.path
+from typing import Any, Dict
 import click
 import requests
 import base64
@@ -36,7 +37,7 @@ def main(config_dir, url, no_backup):
 
     cfg_path = os.path.join(config_dir, "config.yaml")
     with open(cfg_path, "r") as f:
-        cfg = yaml.load(f, yaml.RoundTripLoader)
+        cfg: Dict[Any] = yaml.load(f, yaml.RoundTripLoader)
 
     resp = requests.get(url)
     data = base64.b64decode(resp.content).decode("utf-8")
@@ -52,7 +53,7 @@ def main(config_dir, url, no_backup):
     )
     cfg["proxies"] = proxies
 
-    only_includes = cfg["pyclashsub"]["only-includes"]
+    only_includes = cfg.get("pyclashsub", {}).get("only-includes", [])
 
     i = -1
     for proxy_idx, line in enumerate(data.splitlines()):
@@ -65,8 +66,9 @@ def main(config_dir, url, no_backup):
             continue
 
         node_text = unquote(result.fragment).strip()
-        if node_text not in only_includes:
-            continue
+        if only_includes:
+            if node_text not in only_includes:
+                continue
 
         i += 1
 
