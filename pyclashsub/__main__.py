@@ -15,6 +15,7 @@ import ruamel.yaml as yaml
 import datetime
 import shutil
 import tempfile
+import demjson3
 from urllib.parse import urlparse, unquote
 
 
@@ -32,8 +33,8 @@ from urllib.parse import urlparse, unquote
 )
 def main(config_dir, url, no_backup):
     """Clash subscriber"""
-    trojan_proxy_prefix = "pyclashsub-trojan-"
-    trojan_proxy_name_pattern = "%s%%s" % trojan_proxy_prefix
+    proxy_prefix = "pyclashsub-proxy-"
+    proxy_name_pattern = "%s%%s" % proxy_prefix
 
     cfg_path = os.path.join(config_dir, "config.yaml")
     with open(cfg_path, "r") as f:
@@ -47,9 +48,7 @@ def main(config_dir, url, no_backup):
     if proxies is None:
         proxies = list()
     proxies = list(
-        filter(
-            lambda it: not it["name"].startswith(trojan_proxy_prefix), proxies
-        )
+        filter(lambda it: not it["name"].startswith(proxy_prefix), proxies)
     )
     cfg["proxies"] = proxies
 
@@ -62,33 +61,54 @@ def main(config_dir, url, no_backup):
 
         result = urlparse(line)
 
-        if "trojan" != result.scheme:
+        if "trojan" == result.scheme:
+            node_text = unquote(result.fragment).strip()
+            if only_includes:
+                if node_text not in only_includes:
+                    continue
+
+            aproxy = dict()
+            aproxy["type"] = "trojan"
+            aproxy["name"] = proxy_name_pattern % i
+            aproxy["server"] = result.hostname
+            aproxy["port"] = result.port
+            aproxy["password"] = result.username
+
+            qs = urllib.parse.parse_qs(result.query)
+            qs_value = qs.get("allowInsecure", list())
+            if (len(qs_value) > 0) and bool(int(qs_value[0])):
+                aproxy["skip-cert-verify"] = True
+
+            qs_value = qs.get("sni", list())
+            if len(qs_value) > 0:
+                aproxy["sni"] = qs_value[0]
+
+            proxies.append(aproxy)
+        elif "vmess" == result.scheme:
+            data = demjson3.decode(base64.b64decode(result.netloc))
+
+            aproxy = dict()
+            aproxy["type"] = "vmess"
+            aproxy["name"] = proxy_name_pattern % i
+            aproxy["cipher"] = "auto"
+            aproxy["server"] = data["add"]
+            aproxy["port"] = int(data["port"])
+            aproxy["uuid"] = data["id"]
+            aproxy["alterId"] = int(data["aid"])
+            aproxy["skip-cert-verify"] = True
+            if "udp" == data.get("net"):
+                aproxy["udp"] = True
+
+            if "tls" == data.get("tls"):
+                aproxy["tls"] = True
+
+            if data.get("sni"):
+                aproxy["sni"] = data["sni"]
+            proxies.append(aproxy)
+        else:
             continue
 
-        node_text = unquote(result.fragment).strip()
-        if only_includes:
-            if node_text not in only_includes:
-                continue
-
         i += 1
-
-        aproxy = dict()
-        aproxy["type"] = "trojan"
-        aproxy["name"] = trojan_proxy_name_pattern % i
-        aproxy["server"] = result.hostname
-        aproxy["port"] = result.port
-        aproxy["password"] = result.username
-
-        qs = urllib.parse.parse_qs(result.query)
-        qs_value = qs.get("allowInsecure", list())
-        if (len(qs_value) > 0) and bool(int(qs_value[0])):
-            aproxy["skip-cert-verify"] = True
-
-        qs_value = qs.get("sni", list())
-        if len(qs_value) > 0:
-            aproxy["sni"] = qs_value[0]
-
-        proxies.append(aproxy)
 
     if not no_backup:
         # Backup original config file
