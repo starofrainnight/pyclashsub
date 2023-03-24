@@ -19,6 +19,19 @@ import demjson3
 from urllib.parse import urlparse, unquote
 
 
+def add_proxies_to_auto_group(cfg, proxies):
+    proxy_groups = cfg["proxy-groups"]
+    for agroup in proxy_groups:
+        if agroup["name"] != "auto":
+            continue
+
+        agroup["proxies"] = []
+        for proxy in proxies:
+            agroup["proxies"].append(proxy["name"])
+
+        break
+
+
 def filter_selections(tag, includes, excludes):
     found = False
     for it in includes:
@@ -134,6 +147,8 @@ def main(config_dir, url, no_backup):
             continue
 
         i += 1
+
+    add_proxies_to_auto_group(cfg, proxies)
 
     if not no_backup:
         # Backup original config file
