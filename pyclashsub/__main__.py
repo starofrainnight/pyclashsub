@@ -19,6 +19,23 @@ import demjson3
 from urllib.parse import urlparse, unquote
 
 
+def filter_selections(tag, includes, excludes):
+    found = False
+    for it in includes:
+        if it in tag:
+            found = True
+            break
+
+    if (not found) and (len(includes) > 0):
+        return False
+
+    for it in excludes:
+        if it in tag:
+            return False
+
+    return True
+
+
 @click.command()
 @click.option(
     "-c", "--config-dir", required=True, help="Clash's config directory"
@@ -52,20 +69,22 @@ def main(config_dir, url, no_backup):
     )
     cfg["proxies"] = proxies
 
-    only_includes = cfg.get("pyclashsub", {}).get("only-includes", [])
+    includes = cfg.get("pyclashsub", {}).get("includes", [])
+    excludes = cfg.get("pyclashsub", {}).get("excludes", [])
 
     i = -1
     for proxy_idx, line in enumerate(data.splitlines()):
-
         print("%s: Found proxy %s" % (proxy_idx, line))
 
         result = urlparse(line)
 
         if "trojan" == result.scheme:
             node_text = unquote(result.fragment).strip()
-            if only_includes:
-                if node_text not in only_includes:
-                    continue
+
+            print("Proxy tag: %s" % node_text)
+            if not filter_selections(node_text, includes, excludes):
+                print("Skipped")
+                continue
 
             aproxy = dict()
             aproxy["type"] = "trojan"
@@ -86,6 +105,12 @@ def main(config_dir, url, no_backup):
             proxies.append(aproxy)
         elif "vmess" == result.scheme:
             data = demjson3.decode(base64.b64decode(result.netloc))
+
+            node_text = data["ps"]
+            print("Proxy tag: %s" % node_text)
+            if not filter_selections(node_text, includes, excludes):
+                print("Skipped")
+                continue
 
             aproxy = dict()
             aproxy["type"] = "vmess"
