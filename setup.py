@@ -25,7 +25,7 @@ tests_requires = [
 
 setup(
     name="pyclashsub",
-    version="0.2.0",
+    version="0.2.1",
     description="A python clash subscriber script",
     long_description=long_description,
     author="Hong-She Liang",
