@@ -68,7 +68,8 @@ def main(config_dir, url, no_backup):
 
     cfg_path = os.path.join(config_dir, "config.yaml")
     with open(cfg_path, "r") as f:
-        cfg: Dict[Any] = yaml.load(f, yaml.RoundTripLoader)
+        cfg_yaml = yaml.YAML(typ="rt")
+        cfg: Dict[Any] = cfg_yaml.load(f)
 
     resp = requests.get(url)
     data = base64.b64decode(resp.content).decode("utf-8")
@@ -160,13 +161,8 @@ def main(config_dir, url, no_backup):
 
     # Dump to temporary file
     temp_cfg_file = tempfile.NamedTemporaryFile("w+")
-    yaml.dump(
-        cfg,
-        temp_cfg_file,
-        Dumper=yaml.RoundTripDumper,
-        encoding="utf-8",
-        allow_unicode=True,
-    )
+    cfg_yaml = yaml.YAML()
+    cfg_yaml.dump(cfg, temp_cfg_file)
 
     # Overwrite the cfg file by generated temporary file
     shutil.copy2(temp_cfg_file.name, cfg_path)
